@@ -4,7 +4,7 @@ import "fmt"
 
 func useLable1() {
 	x := 7
-	table := [][]int{{1, 5, 9}, {2, 6, 5, 13}, {5, 3, 7, 4}}
+	table := [][]int{{1, 5, 9}, {2, 6, 5, 13}, {5, 3, 7, 5}}
 
 LOOP:
 	for row, rowValue := range table {
