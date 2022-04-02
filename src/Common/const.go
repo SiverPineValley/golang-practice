@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 /*
@@ -153,4 +156,71 @@ func CheckType(v interface{}) {
 	default:
 		fmt.Printf("%v is unknown type\n", v)
 	}
+}
+
+/*
+	병행처리 관련 const
+*/
+
+func Long() {
+	fmt.Println("long 함수 시작", time.Now())
+	time.Sleep(2 * time.Second)
+	fmt.Println("long 함수 종료", time.Now())
+}
+
+func Short() {
+	fmt.Println("short 함수 시작", time.Now())
+	time.Sleep(1 * time.Second)
+	fmt.Println("short 함수 종료", time.Now())
+}
+
+func LongChan(done chan bool) {
+	fmt.Println("long 함수 시작", time.Now())
+	time.Sleep(2 * time.Second)
+	fmt.Println("long 함수 종료", time.Now())
+	done <- true
+}
+
+func ShortChan(done chan bool) {
+	fmt.Println("short 함수 시작", time.Now())
+	time.Sleep(1 * time.Second)
+	fmt.Println("short 함수 종료", time.Now())
+	done <- true
+}
+
+/*
+	저수준 제어 관련 const
+ */
+
+type Counter struct {
+	I int64
+	Mu sync.Mutex
+	once sync.Once
+}
+
+func (c *Counter) Increment() {
+	c.I += 1
+}
+
+func (c *Counter) IncrementMutex() {
+	c.Mu.Lock()
+	c.I += 1
+	c.Mu.Unlock()
+}
+
+func (c *Counter) IncrementSyncOnce() {
+	c.once.Do(func() {
+		c.I = -500
+	})
+	c.Mu.Lock()
+	c.I += 1
+	c.Mu.Unlock()
+}
+
+func (c *Counter) IncrementAtomic() {
+	atomic.AddInt64(&c.I, 1)
+}
+
+func (c *Counter) Display() {
+	fmt.Println(c.I)
 }
