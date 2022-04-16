@@ -26,4 +26,10 @@ func Concurrency() {
 	waitGroup()
 	fmt.Println("\n5.5. 원자성을 보장하는 연산")
 	atomic()
+	fmt.Println("\n5.6. 병행처리 활용 - 타임아웃")
+	timeout()
+	fmt.Println("\n6. 공유 메모리")
+	sharedMap()
+	fmt.Println("\n7. 파이프라인")
+	pipeline()
 }

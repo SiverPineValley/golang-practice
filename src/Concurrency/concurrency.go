@@ -171,3 +171,56 @@ func atomic() {
 
 	c.Display()
 }
+
+func timeout() {
+	quit := make(chan struct{})
+	done := common.Process(quit)
+	timeout := time.After(1 * time.Second)
+
+	select {
+	case d := <-done:
+		fmt.Println(d)
+	case <-timeout:
+		quit <- struct{}{}
+		fmt.Println("Time out!!")
+	}
+
+	return
+}
+
+func sharedMap() {
+	m := common.NewMap()
+
+	// Set item
+	ok := m.Set("foo", "bar")
+	fmt.Println(ok)
+
+	// Get item
+	t, ok := m.Get("foo")
+
+	// Check if item exists
+	if ok {
+		bar := t.(string)
+		fmt.Println("bar: ", bar)
+	}
+
+	// Count item
+	fmt.Println("Count: ", m.Count())
+
+	// Remove item
+	ok = m.Remove("foo")
+	fmt.Println(ok)
+
+	// Count item
+	fmt.Println("Count: ", m.Count())
+
+	return
+}
+
+func pipeline() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	path := "/Users/parkjongin/workspace/go/src/golang-practice"
+	pattern := ".go$"
+	<-common.Show(common.Grep(pattern, common.Find(path)))
+	return
+}

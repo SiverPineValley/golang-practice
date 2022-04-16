@@ -1,8 +1,14 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -86,6 +92,7 @@ func (p RentalPeriod) Todays() int {
 		return 1
 	}
 }
+
 type Rental struct {
 	Name         string
 	FeePerDay    float64
@@ -94,7 +101,7 @@ type Rental struct {
 }
 
 func (r Rental) Cost() float64 {
-	return r.FeePerDay * float64(r.Todays() * r.PeriodLength)
+	return r.FeePerDay * float64(r.Todays()*r.PeriodLength)
 }
 
 func (r Rental) String() string {
@@ -190,11 +197,11 @@ func ShortChan(done chan bool) {
 
 /*
 	저수준 제어 관련 const
- */
+*/
 
 type Counter struct {
-	I int64
-	Mu sync.Mutex
+	I    int64
+	Mu   sync.Mutex
 	once sync.Once
 }
 
@@ -223,4 +230,205 @@ func (c *Counter) IncrementAtomic() {
 
 func (c *Counter) Display() {
 	fmt.Println(c.I)
+}
+
+/*
+	병행 처리 활용 관련 함수
+*/
+
+const (
+	set = iota
+	get
+	remove
+	count
+)
+
+type SharedMap struct {
+	m map[string]interface{}
+	c chan Command
+}
+
+type Command struct {
+	key    string
+	value  interface{}
+	action int
+	result chan<- interface{}
+}
+
+func Process(quit <-chan struct{}) chan string {
+	done := make(chan string)
+	go func() {
+		go func() {
+			time.Sleep(10 * time.Second) // heavy job
+
+			done <- "Complete !!"
+		}()
+		<-quit
+		return
+	}()
+
+	return done
+}
+
+func (sm SharedMap) Set(k string, v interface{}) (r bool) {
+	callback := make(chan interface{})
+	sm.c <- Command{action: set, key: k, value: v, result: callback}
+	r = (<-callback).(bool)
+	return
+}
+
+func (sm SharedMap) Get(k string) (v interface{}, r bool) {
+	callback := make(chan interface{})
+	sm.c <- Command{action: get, key: k, result: callback}
+	result := (<-callback).([2]interface{})
+	v = result[0]
+	r = result[1].(bool)
+	return
+}
+
+func (sm SharedMap) Remove(k string) (r bool) {
+	callback := make(chan interface{})
+	sm.c <- Command{action: remove, key: k, result: callback}
+	r = (<-callback).(bool)
+	return
+}
+
+func (sm SharedMap) Count() (r int) {
+	callback := make(chan interface{})
+	sm.c <- Command{action: count, result: callback}
+	r = (<-callback).(int)
+	return
+}
+
+func (sm SharedMap) run() {
+	for cmd := range sm.c {
+		switch cmd.action {
+		case set:
+			sm.m[cmd.key] = cmd.value
+			_, ok := sm.m[cmd.key]
+			cmd.result <- ok
+		case get:
+			v, ok := sm.m[cmd.key]
+			cmd.result <- [2]interface{}{v, ok}
+		case remove:
+			_, ok := sm.m[cmd.key]
+			if !ok {
+				cmd.result <- false
+			} else {
+				delete(sm.m, cmd.key)
+				_, ok = sm.m[cmd.key]
+				cmd.result <- !ok
+			}
+		case count:
+			cmd.result <- len(sm.m)
+		}
+	}
+}
+
+func NewMap() SharedMap {
+	sm := SharedMap{
+		m: make(map[string]interface{}),
+		c: make(chan Command),
+	}
+	go sm.run()
+	return sm
+}
+
+const BUF_SIZE = 1000
+
+var (
+	workers = runtime.NumCPU()
+)
+
+func Find(path string) <-chan string {
+	out := make(chan string, BUF_SIZE)
+	done := make(chan struct{}, workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			filepath.Walk(path, func(file string, info os.FileInfo, err error) error {
+				out <- file
+				return nil
+			})
+			done <- struct{}{}
+		}()
+	}
+	go func() {
+		for i := 0; i < cap(done); i++ {
+			<-done
+		}
+		close(out)
+	}()
+
+	return out
+}
+
+func Grep(pattern string, in <-chan string) <-chan string {
+	out := make(chan string, cap(in))
+	go func() {
+		regex, err := regexp.Compile(pattern)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		for file := range in {
+			if regex.MatchString(file) {
+				out <- file
+			}
+		}
+		close(out)
+	}()
+	return out
+}
+
+func Show(in <-chan string) <-chan struct{} {
+	quit := make(chan struct{})
+	go func() {
+		for file := range in {
+			c, err := lineCount(file)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			fmt.Println("8d %s\n", c, file)
+		}
+		quit <- struct{}{}
+	}()
+	return quit
+}
+
+func lineCount(file string) (int, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	if info.Mode().IsDir() {
+		return 0, fmt.Errorf("%s is a directory", file)
+	}
+
+	count := 0
+	buf := make([]byte, 1024*8)
+	newLine := []byte{'\n'}
+
+	for {
+		c, err := f.Read(buf)
+		if err != nil && err != io.EOF {
+			fmt.Println(err)
+			return 0, err
+		}
+
+		count += bytes.Count(buf[:c], newLine)
+
+		if err == io.EOF {
+			break
+		}
+	}
+	return count, nil
 }
