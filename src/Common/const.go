@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -431,4 +432,45 @@ func lineCount(file string) (int, error) {
 		}
 	}
 	return count, nil
+}
+
+/*
+	에러 처리 관련 공통 함수
+*/
+func Protect(g func()) {
+	defer func() {
+		log.Println("done")
+
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	log.Println("start")
+	g()
+}
+
+func Divide(a, b int) int {
+	return a / b
+}
+
+func DivideRecover(a, b int) int {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	return a / b
+}
+
+type FType func(int, int) int
+
+func ErrorHandler(fn FType) FType {
+	return func(a int, b int) int {
+		defer func() {
+			if err, ok := recover().(error); ok {
+				log.Printf("run time panic: %v", err)
+			}
+		}()
+		return fn(a, b)
+	}
 }
