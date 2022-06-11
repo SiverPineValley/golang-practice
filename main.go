@@ -5,6 +5,7 @@ import (
 	cc "golang-practice/src/Concurrency"
 	"golang-practice/src/Error"
 	object "golang-practice/src/ObjectOriented"
+	"golang-practice/src/Package"
 	types "golang-practice/src/Types"
 	bg "golang-practice/src/basicGrammar"
 	_ "os"
@@ -18,7 +19,7 @@ func main() {
 	fmt.Printf("3. 객체 지향 프로그래밍\n")
 	fmt.Printf("4. 병행처리\n")
 	fmt.Printf("5. 에러처리\n")
-	//fmt.Printf("6. 패키지\n")
+	fmt.Printf("6. 패키지\n")
 	fmt.Printf("입력하세요: ")
 	fmt.Scanln(&chapter)
 
@@ -33,6 +34,8 @@ func main() {
 		cc.Concurrency()
 	case "5":
 		Error.ErrorProcessing()
+	case "6":
+		Package.Package()
 	}
 
 }

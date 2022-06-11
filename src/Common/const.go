@@ -474,3 +474,28 @@ func ErrorHandler(fn FType) FType {
 		return fn(a, b)
 	}
 }
+
+type User struct{
+	Name string "check:len(3,40)"
+	Id int "check:range(1,999999)"
+}
+
+func TitleCase(s string) string {
+	return strings.Title(s)
+}
+
+func Len(x interface{}) int {
+	value := reflect.ValueOf(x)
+	switch reflect.TypeOf(x).Kind() {
+	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice, reflect.String:
+		return value.Len()
+	default:
+		if method := value.MethodByName("Len"); method.IsValid() {
+			values := method.Call(nil)
+			return int(values[0].Int())
+		}
+	}
+
+	fmt.Sprintf("'%v' does not hiave a length", x)
+	return -1
+}

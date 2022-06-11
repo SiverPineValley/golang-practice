@@ -3,7 +3,7 @@ package Error
 import "fmt"
 
 func ErrorProcessing() {
-	fmt.Println("1. recover")
+	fmt.Println("\n1. recover")
 	Recover()
 
 	fmt.Println("\n2. protect")
